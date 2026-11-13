@@ -4,37 +4,46 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Neon Highway Dodger</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tone.js for procedural arcade sound effects without external audio URLs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
     * {
       box-sizing: border-box;
-      margin: 0;
-      padding: 0;
       user-select: none;
       -webkit-user-select: none;
+      touch-action: manipulation;
     }
 
     body {
-      background-color: #090a10;
-      color: #ffffff;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
+      margin: 0;
+      background: radial-gradient(circle at top, #18182b 0%, #090910 100%);
+      color: #f8fafc;
+      font-family: 'Inter', sans-serif;
       overflow: hidden;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
 
-    #game-container {
+    .font-arcade {
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    #game-wrapper {
       position: relative;
       width: 100%;
-      max-width: 420px;
-      height: 100vh;
+      max-width: 440px;
+      height: 100%;
       max-height: 760px;
-      background: #121521;
-      border-left: 2px solid #1e2438;
-      border-right: 2px solid #1e2438;
-      box-shadow: 0 0 40px rgba(0, 240, 255, 0.15);
+      border-radius: 20px;
       overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75), 0 0 25px rgba(56, 189, 248, 0.25);
+      border: 2px solid rgba(56, 189, 248, 0.35);
+      background: #11131f;
     }
 
     canvas {
@@ -43,505 +52,684 @@
       height: 100%;
     }
 
-    /* HUD */
-    #hud {
-      position: absolute;
-      top: 16px;
-      left: 16px;
-      right: 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      pointer-events: none;
-      z-index: 10;
+    /* Arcade Button Styles */
+    .btn-arcade {
+      background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+      border: 2px solid #7dd3fc;
+      box-shadow: 0 6px 0 #1d4ed8, 0 10px 20px rgba(6, 182, 212, 0.45);
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
     }
 
-    .score-box {
-      background: rgba(12, 16, 28, 0.8);
-      border: 1px solid rgba(0, 240, 255, 0.35);
-      padding: 8px 14px;
-      border-radius: 10px;
-      backdrop-filter: blur(4px);
+    .btn-arcade:active {
+      transform: translateY(4px);
+      box-shadow: 0 2px 0 #1d4ed8, 0 4px 10px rgba(6, 182, 212, 0.45);
     }
 
-    .score-label {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: #8896b8;
-    }
-
-    .score-val {
-      font-size: 22px;
-      font-weight: 800;
-      color: #00f0ff;
-      text-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
-    }
-
-    #best-val {
-      color: #ff2a85;
-      text-shadow: 0 0 10px rgba(255, 42, 133, 0.6);
-    }
-
-    /* Overlays (Start & Game Over) */
-    .overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(9, 11, 18, 0.85);
+    .btn-control {
+      background: rgba(30, 41, 59, 0.85);
       backdrop-filter: blur(6px);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-      padding: 24px;
-      z-index: 20;
-      transition: opacity 0.25s ease;
+      border: 2px solid rgba(148, 163, 184, 0.35);
+      box-shadow: 0 4px 0 rgba(15, 23, 42, 0.9);
+      transition: transform 0.06s ease, background-color 0.1s ease;
     }
 
-    .hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    h1 {
-      font-size: 36px;
-      font-weight: 900;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      background: linear-gradient(90deg, #00f0ff, #ff2a85);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin-bottom: 10px;
-    }
-
-    p.subtitle {
-      color: #a0aec0;
-      font-size: 15px;
-      margin-bottom: 28px;
-      line-height: 1.5;
-    }
-
-    button.btn {
-      background: linear-gradient(135deg, #00f0ff, #0099ff);
-      color: #070a12;
-      border: none;
-      padding: 14px 36px;
-      font-size: 18px;
-      font-weight: 800;
-      border-radius: 999px;
-      cursor: pointer;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      box-shadow: 0 0 20px rgba(0, 240, 255, 0.5);
-      transition: transform 0.12s ease, box-shadow 0.12s ease;
-    }
-
-    button.btn:hover {
-      transform: scale(1.05);
-      box-shadow: 0 0 28px rgba(0, 240, 255, 0.8);
-    }
-
-    button.btn:active {
-      transform: scale(0.97);
-    }
-
-    /* Mobile Touch Controls */
-    #touch-controls {
-      position: absolute;
-      bottom: 18px;
-      left: 16px;
-      right: 16px;
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      z-index: 15;
-    }
-
-    .touch-btn {
-      flex: 1;
-      height: 58px;
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 14px;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 24px;
-      font-weight: bold;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      cursor: pointer;
-    }
-
-    .touch-btn:active {
-      background: rgba(0, 240, 255, 0.25);
-      border-color: #00f0ff;
-      color: #fff;
+    .btn-control:active {
+      transform: translateY(3px);
+      background: rgba(56, 189, 248, 0.35);
+      border-color: #38bdf8;
     }
   </style>
 </head>
-<body>
-  <div id="game-container">
-    <div id="hud">
-      <div class="score-box">
-        <div class="score-label">Score</div>
-        <div class="score-val" id="score-val">0</div>
+<body class="p-2 sm:p-4">
+
+  <!-- Main Game Container -->
+  <div id="game-wrapper" class="flex flex-col">
+    
+    <!-- Top HUD Bar -->
+    <div class="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-slate-950/90 to-transparent pointer-events-none">
+      <div class="bg-slate-900/80 border border-cyan-500/30 rounded-xl px-3 py-1.5 backdrop-blur-sm">
+        <div class="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">Score</div>
+        <div id="score-display" class="font-arcade text-xl sm:text-2xl font-extrabold text-white leading-none">0</div>
       </div>
-      <div class="score-box">
-        <div class="score-label">Best</div>
-        <div class="score-val" id="best-val">0</div>
+
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <!-- Sound Toggle -->
+        <button id="sound-btn" aria-label="Toggle Sound" class="bg-slate-900/85 hover:bg-slate-800 border border-slate-700 rounded-xl p-2 text-cyan-400 transition">
+          <svg id="sound-on-icon" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14" />
+          </svg>
+          <svg id="sound-off-icon" class="w-5 h-5 hidden text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6" />
+          </svg>
+        </button>
+
+        <div class="bg-slate-900/80 border border-amber-500/30 rounded-xl px-3 py-1.5 backdrop-blur-sm text-right">
+          <div class="text-[10px] uppercase tracking-wider text-amber-400 font-semibold">Best</div>
+          <div id="best-display" class="font-arcade text-xl sm:text-2xl font-extrabold text-amber-300 leading-none">0</div>
+        </div>
       </div>
     </div>
 
+    <!-- Game Canvas -->
     <canvas id="gameCanvas"></canvas>
 
-    <!-- Start Screen -->
-    <div class="overlay" id="start-screen">
-      <h1>Neon Dodger</h1>
-      <p class="subtitle">
-        Use <strong>Left / Right Arrows</strong> (or <strong>A / D</strong>) to switch lanes.<br />
-        Dodge oncoming traffic to rack up points!
+    <!-- Start / Game Over Overlay -->
+    <div id="overlay" class="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-sm p-6 text-center transition-opacity duration-200">
+      <div class="mb-2 inline-block px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-xs font-semibold tracking-widest uppercase">
+        Arcade Traffic Racer
+      </div>
+      <h1 id="overlay-title" class="font-arcade text-3xl sm:text-4xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-sky-400 to-indigo-400 mb-3">
+        NEON DODGER
+      </h1>
+      <p id="overlay-subtitle" class="text-slate-300 text-sm sm:text-base max-w-xs mb-6">
+        Weave through oncoming highway traffic. Survive longer to rack up higher points!
       </p>
-      <button class="btn" id="start-btn">Start Engine</button>
+
+      <!-- Final Score Card (shown on Game Over) -->
+      <div id="final-stats" class="hidden w-full max-w-xs bg-slate-900/90 border border-slate-700/80 rounded-2xl p-4 mb-6 shadow-inner">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <div class="text-xs text-slate-400 uppercase">Final Score</div>
+            <div id="final-score" class="font-arcade text-2xl font-bold text-white mt-0.5">0</div>
+          </div>
+          <div>
+            <div class="text-xs text-amber-400 uppercase">High Score</div>
+            <div id="final-best" class="font-arcade text-2xl font-bold text-amber-300 mt-0.5">0</div>
+          </div>
+        </div>
+      </div>
+
+      <button id="start-btn" class="btn-arcade font-arcade text-white font-extrabold text-lg px-8 py-3.5 rounded-2xl tracking-wider uppercase cursor-pointer">
+        START ENGINE
+      </button>
+
+      <div class="mt-6 text-xs text-slate-400 flex items-center justify-center gap-4">
+        <span>⌨️ <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-200">←</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-200">→</kbd> or <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-200">A</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-200">D</kbd></span>
+        <span>📱 Tap or Swipe</span>
+      </div>
     </div>
 
-    <!-- Game Over Screen -->
-    <div class="overlay hidden" id="gameover-screen">
-      <h1>Wrecked!</h1>
-      <p class="subtitle">Final Score: <strong id="final-score" style="color:#00f0ff; font-size:20px;">0</strong></p>
-      <button class="btn" id="restart-btn">Play Again</button>
+    <!-- Bottom Touch Controls (Outside Canvas Area / Overlay Bar at Bottom) -->
+    <div id="touch-controls" class="absolute bottom-3 left-3 right-3 z-20 flex justify-between gap-3 sm:opacity-85">
+      <button id="btn-left" aria-label="Move Left" class="btn-control flex-1 py-3.5 rounded-2xl flex items-center justify-center text-white active:text-cyan-300">
+        <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+      <button id="btn-right" aria-label="Move Right" class="btn-control flex-1 py-3.5 rounded-2xl flex items-center justify-center text-white active:text-cyan-300">
+        <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
     </div>
 
-    <!-- On-Screen Buttons for Mobile/Mouse -->
-    <div id="touch-controls">
-      <div class="touch-btn" id="btn-left">&#9664;</div>
-      <div class="touch-btn" id="btn-right">&#9654;</div>
-    </div>
   </div>
 
   <script>
+    /**
+     * NEON HIGHWAY DODGER
+     * Single-file HTML5 Canvas traffic dodging game with responsive scaling,
+     * keyboard/touch/swipe controls, particle effects, and Tone.js synth audio.
+     */
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const container = document.getElementById('game-container');
+    const wrapper = document.getElementById('game-wrapper');
 
     // UI Elements
-    const scoreEl = document.getElementById('score-val');
-    const bestEl = document.getElementById('best-val');
+    const scoreDisplay = document.getElementById('score-display');
+    const bestDisplay = document.getElementById('best-display');
+    const overlay = document.getElementById('overlay');
+    const overlayTitle = document.getElementById('overlay-title');
+    const overlaySubtitle = document.getElementById('overlay-subtitle');
+    const finalStats = document.getElementById('final-stats');
     const finalScoreEl = document.getElementById('final-score');
-    const startScreen = document.getElementById('start-screen');
-    const gameoverScreen = document.getElementById('gameover-screen');
+    const finalBestEl = document.getElementById('final-best');
+    const startBtn = document.getElementById('start-btn');
+    const btnLeft = document.getElementById('btn-left');
+    const btnRight = document.getElementById('btn-right');
+    const soundBtn = document.getElementById('sound-btn');
+    const soundOnIcon = document.getElementById('sound-on-icon');
+    const soundOffIcon = document.getElementById('sound-off-icon');
+
+    // Game Configuration
+    const LANE_COUNT = 3;
+    let width = 0;
+    let height = 0;
+    let laneWidth = 0;
+    let roadMargin = 24;
 
     // Game State
-    const LANES = 3;
-    let laneWidth = 0;
-    let gameRunning = false;
+    let gameState = 'START'; // 'START', 'PLAYING', 'GAMEOVER'
     let score = 0;
-    let bestScore = localStorage.getItem('neonDodgerBest') || 0;
-    bestEl.textContent = bestScore;
-
-    let baseSpeed = 5;
+    let highScore = 0;
+    let speed = 5;
     let roadOffset = 0;
     let spawnTimer = 0;
-    let enemies = [];
-    let particles = [];
+    let spawnInterval = 75;
+    let animationId = null;
+    let soundEnabled = true;
+
+    // Load saved high score safely
+    try {
+      const saved = localStorage.getItem('neon_dodger_best');
+      if (saved) highScore = parseInt(saved, 10) || 0;
+    } catch (e) {
+      highScore = 0;
+    }
+    bestDisplay.textContent = highScore;
 
     // Player Object
     const player = {
-      lane: 1, // 0 = left, 1 = middle, 2 = right
+      lane: 1, // 0 = left, 1 = center, 2 = right
       x: 0,
       y: 0,
-      width: 44,
-      height: 78,
-      color: '#00f0ff'
+      targetX: 0,
+      width: 48,
+      height: 86,
+      tilt: 0
     };
 
-    // Resize canvas to fit container crisply
-    function resizeCanvas() {
-      canvas.width = container.clientWidth;
-      canvas.height = container.clientHeight;
-      laneWidth = canvas.width / LANES;
-      player.y = canvas.height - 155;
-      if (!gameRunning) {
-        player.x = getLaneCenterX(player.lane);
+    // Traffic & Visual Effects Arrays
+    let enemies = [];
+    let particles = [];
+    let floatingTexts = [];
+
+    // Enemy Car Palettes
+    const ENEMY_STYLES = [
+      { body: '#ef4444', accent: '#fca5a5', roof: '#991b1b' }, // Crimson Racer
+      { body: '#f59e0b', accent: '#fde68a', roof: '#b45309' }, // Amber Taxi
+      { body: '#a855f7', accent: '#e9d5ff', roof: '#6b21a8' }, // Purple Coupe
+      { body: '#10b981', accent: '#a7f3d0', roof: '#065f46' }  // Emerald Sedan
+    ];
+
+    // --- SOUND ENGINE (Tone.js) ---
+    let synth = null;
+    let crashNoise = null;
+
+    function initAudio() {
+      if (synth || typeof Tone === 'undefined') return;
+      try {
+        synth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: 'triangle' },
+          envelope: { attack: 0.01, decay: 0.1, sustain: 0.05, release: 0.1 }
+        }).toDestination();
+        synth.volume.value = -10;
+
+        crashNoise = new Tone.NoiseSynth({
+          noise: { type: 'brown' },
+          envelope: { attack: 0.01, decay: 0.35, sustain: 0, release: 0.1 }
+        }).toDestination();
+        crashNoise.volume.value = -6;
+      } catch (err) {
+        console.warn('Audio init skipped:', err);
       }
     }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
+
+    function playSound(type) {
+      if (!soundEnabled || !synth) return;
+      try {
+        if (Tone.context.state !== 'running') {
+          Tone.start();
+        }
+        if (type === 'move') {
+          synth.triggerAttackRelease('C5', '32n');
+        } else if (type === 'score') {
+          synth.triggerAttackRelease('E5', '16n');
+        } else if (type === 'crash') {
+          crashNoise.triggerAttackRelease('8n');
+          synth.triggerAttackRelease(['C2', 'F#2'], '4n');
+        }
+      } catch (e) {}
+    }
+
+    soundBtn.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      soundOnIcon.classList.toggle('hidden', !soundEnabled);
+      soundOffIcon.classList.toggle('hidden', soundEnabled);
+    });
+
+    // --- RESPONSIVE CANVAS SIZING ---
+    function resizeCanvas() {
+      const rect = wrapper.getBoundingClientRect();
+      width = rect.width;
+      height = rect.height;
+      canvas.width = width;
+      canvas.height = height;
+
+      roadMargin = Math.max(18, width * 0.06);
+      const roadWidth = width - roadMargin * 2;
+      laneWidth = roadWidth / LANE_COUNT;
+
+      // Scale car dimensions proportionally to lane width
+      player.width = Math.min(54, laneWidth * 0.56);
+      player.height = player.width * 1.78;
+      player.y = height - player.height - 86; // Leave room for bottom touch controls
+      player.targetX = getLaneCenterX(player.lane);
+
+      if (gameState !== 'PLAYING') {
+        player.x = player.targetX;
+      }
+    }
 
     function getLaneCenterX(laneIndex) {
-      return laneIndex * laneWidth + laneWidth / 2;
+      return roadMargin + laneWidth * laneIndex + laneWidth / 2;
     }
 
-    // Simple Web Audio Sound Effects (No external files needed)
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    function playSound(type) {
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+      if (gameState !== 'PLAYING') drawScene();
+    });
 
-      const now = audioCtx.currentTime;
-      if (type === 'move') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(280, now);
-        osc.frequency.exponentialRampToValueAtTime(480, now + 0.08);
-        gain.gain.setValueAtTime(0.08, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-        osc.start(now);
-        osc.stop(now + 0.08);
-      } else if (type === 'score') {
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(520, now);
-        osc.frequency.setValueAtTime(780, now + 0.06);
-        gain.gain.setValueAtTime(0.07, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
-        osc.start(now);
-        osc.stop(now + 0.14);
-      } else if (type === 'crash') {
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(140, now);
-        osc.frequency.exponentialRampToValueAtTime(35, now + 0.4);
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-        osc.start(now);
-        osc.stop(now + 0.4);
-      }
-    }
-
-    // Controls
+    // --- INPUT HANDLING (Keyboard, Touch Buttons, Swipe) ---
     function moveLeft() {
-      if (!gameRunning) return;
+      if (gameState !== 'PLAYING') return;
       if (player.lane > 0) {
         player.lane--;
+        player.targetX = getLaneCenterX(player.lane);
+        player.tilt = -0.18;
         playSound('move');
       }
     }
 
     function moveRight() {
-      if (!gameRunning) return;
-      if (player.lane < LANES - 1) {
+      if (gameState !== 'PLAYING') return;
+      if (player.lane < LANE_COUNT - 1) {
         player.lane++;
+        player.targetX = getLaneCenterX(player.lane);
+        player.tilt = 0.18;
         playSound('move');
       }
     }
 
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') moveLeft();
-      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') moveRight();
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        moveLeft();
+      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        moveRight();
+      } else if ((e.key === ' ' || e.key === 'Enter') && gameState !== 'PLAYING') {
+        e.preventDefault();
+        startGame();
+      }
     });
 
-    document.getElementById('btn-left').addEventListener('pointerdown', moveLeft);
-    document.getElementById('btn-right').addEventListener('pointerdown', moveRight);
+    btnLeft.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      moveLeft();
+    });
 
-    // Spawn oncoming cars (guarantees at least 1 open lane)
-    function spawnTraffic() {
-      const colors = ['#ff2a85', '#ffbe0b', '#8338ec', '#fb5607'];
-      const lanes = [0, 1, 2];
-      // Shuffle lanes
-      lanes.sort(() => Math.random() - 0.5);
+    btnRight.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      moveRight();
+    });
 
-      // Spawn 1 or 2 cars depending on current score
-      const count = score > 8 && Math.random() > 0.45 ? 2 : 1;
+    // Swipe support directly on the canvas
+    let touchStartX = 0;
+    canvas.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].clientX;
+    }, { passive: true });
 
-      for (let i = 0; i < count; i++) {
-        const lane = lanes[i];
+    canvas.addEventListener('touchend', (e) => {
+      if (gameState !== 'PLAYING') return;
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(dx) > 25) {
+        if (dx < 0) moveLeft();
+        else moveRight();
+      } else {
+        // Tap left or right side of screen
+        const tapX = e.changedTouches[0].clientX - wrapper.getBoundingClientRect().left;
+        if (tapX < width / 2) moveLeft();
+        else moveRight();
+      }
+    }, { passive: true });
+
+    // --- GAME LIFECYCLE ---
+    function startGame() {
+      initAudio();
+      if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
+        Tone.start().catch(() => {});
+      }
+
+      resizeCanvas();
+      score = 0;
+      speed = Math.max(5.5, height * 0.0085);
+      spawnTimer = 0;
+      spawnInterval = 72;
+      enemies = [];
+      particles = [];
+      floatingTexts = [];
+
+      player.lane = 1;
+      player.x = getLaneCenterX(1);
+      player.targetX = player.x;
+      player.tilt = 0;
+
+      scoreDisplay.textContent = '0';
+      overlay.classList.add('opacity-0', 'pointer-events-none');
+      gameState = 'PLAYING';
+    }
+
+    function triggerGameOver() {
+      gameState = 'GAMEOVER';
+      playSound('crash');
+      createExplosion(player.x, player.y + player.height / 2, '#38bdf8');
+      createExplosion(player.x, player.y + player.height / 2, '#f43f5e');
+
+      if (score > highScore) {
+        highScore = score;
+        bestDisplay.textContent = highScore;
+        try {
+          localStorage.setItem('neon_dodger_best', highScore.toString());
+        } catch (e) {}
+      }
+
+      overlayTitle.textContent = 'WRECKED!';
+      overlaySubtitle.textContent = 'Watch out for sudden lane blockers!';
+      finalScoreEl.textContent = score;
+      finalBestEl.textContent = highScore;
+      finalStats.classList.remove('hidden');
+      startBtn.textContent = 'RACE AGAIN';
+
+      setTimeout(() => {
+        overlay.classList.remove('opacity-0', 'pointer-events-none');
+      }, 450);
+    }
+
+    startBtn.addEventListener('click', startGame);
+
+    // --- SPAWNING & PARTICLES ---
+    function spawnEnemyWave() {
+      // Decide whether to spawn 1 or 2 cars (never block all 3 lanes!)
+      const maxBlock = score >= 15 && Math.random() < 0.45 ? 2 : 1;
+      const availableLanes = [0, 1, 2];
+
+      for (let i = 0; i < maxBlock; i++) {
+        const randIdx = Math.floor(Math.random() * availableLanes.length);
+        const lane = availableLanes.splice(randIdx, 1)[0];
+        const style = ENEMY_STYLES[Math.floor(Math.random() * ENEMY_STYLES.length)];
+        const carW = player.width;
+        const carH = player.height * (0.95 + Math.random() * 0.15);
+
         enemies.push({
           lane,
           x: getLaneCenterX(lane),
-          y: -90,
-          width: 44,
-          height: 78,
-          speedOffset: Math.random() * 1.5,
-          color: colors[Math.floor(Math.random() * colors.length)],
+          y: -carH - 20,
+          width: carW,
+          height: carH,
+          speedOffset: (Math.random() - 0.3) * 1.4,
+          style,
           passed: false
         });
       }
     }
 
-    // Create explosion particles on crash
-    function createExplosion(x, y) {
-      for (let i = 0; i < 35; i++) {
+    function createExplosion(x, y, color) {
+      for (let i = 0; i < 24; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const velocity = 2 + Math.random() * 6;
         particles.push({
           x,
           y,
-          vx: (Math.random() - 0.5) * 10,
-          vy: (Math.random() - 0.5) * 10,
-          size: Math.random() * 5 + 2,
-          alpha: 1,
-          color: Math.random() > 0.5 ? '#00f0ff' : '#ff2a85'
+          vx: Math.cos(angle) * velocity,
+          vy: Math.sin(angle) * velocity,
+          size: 3 + Math.random() * 4,
+          color,
+          alpha: 1
         });
       }
     }
 
-    // Draw a stylized top-down neon car
-    function drawCar(x, y, w, h, color, isPlayer) {
-      ctx.save();
-      ctx.translate(x - w / 2, y - h / 2);
-
-      // Neon underglow
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 16;
-
-      // Car body
-      ctx.fillStyle = '#161b2e';
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.roundRect(0, 0, w, h, 10);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.shadowBlur = 0;
-
-      // Windshield & Roof
-      ctx.fillStyle = color;
-      ctx.globalAlpha = 0.25;
-      ctx.beginPath();
-      ctx.roundRect(6, isPlayer ? 22 : 18, w - 12, h - 40, 6);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-
-      // Headlights / Taillights
-      if (isPlayer) {
-        // White headlights facing up
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(6, 2, 8, 4);
-        ctx.fillRect(w - 14, 2, 8, 4);
-      } else {
-        // Glowing headlights facing down
-        ctx.fillStyle = '#fff3b0';
-        ctx.fillRect(6, h - 6, 8, 4);
-        ctx.fillRect(w - 14, h - 6, 8, 4);
-      }
-
-      ctx.restore();
+    function addFloatingText(x, y, text) {
+      floatingTexts.push({
+        x,
+        y,
+        text,
+        alpha: 1
+      });
     }
 
-    function startGame() {
-      score = 0;
-      baseSpeed = 5.5;
-      enemies = [];
-      particles = [];
-      player.lane = 1;
-      player.x = getLaneCenterX(1);
-      scoreEl.textContent = '0';
+    // --- UPDATE LOOP ---
+    function update() {
+      if (gameState === 'PLAYING') {
+        // Scroll road markings
+        roadOffset = (roadOffset + speed) % 60;
 
-      startScreen.classList.add('hidden');
-      gameoverScreen.classList.add('hidden');
-      gameRunning = true;
-      requestAnimationFrame(gameLoop);
-    }
+        // Smooth lane transition & car tilt recovery
+        player.x += (player.targetX - player.x) * 0.22;
+        player.tilt *= 0.85;
 
-    function endGame() {
-      gameRunning = false;
-      playSound('crash');
-      createExplosion(player.x, player.y);
+        // Gradually increase difficulty
+        speed += 0.0022;
+        spawnInterval = Math.max(36, 74 - score * 0.45);
 
-      if (score > bestScore) {
-        bestScore = score;
-        localStorage.setItem('neonDodgerBest', bestScore);
-        bestEl.textContent = bestScore;
-      }
-
-      finalScoreEl.textContent = score;
-      setTimeout(() => {
-        gameoverScreen.classList.remove('hidden');
-      }, 450);
-    }
-
-    function gameLoop() {
-      // Clear road background
-      ctx.fillStyle = '#121521';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Draw scrolling lane dividers
-      if (gameRunning) {
-        roadOffset = (roadOffset + baseSpeed) % 60;
-      }
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
-      ctx.lineWidth = 3;
-      ctx.setLineDash([30, 30]);
-      ctx.lineDashOffset = -roadOffset;
-
-      for (let i = 1; i < LANES; i++) {
-        const lineX = i * laneWidth;
-        ctx.beginPath();
-        ctx.moveTo(lineX, 0);
-        ctx.lineTo(lineX, canvas.height);
-        ctx.stroke();
-      }
-      ctx.setLineDash([]);
-
-      // Smoothly glide player toward target lane X
-      const targetX = getLaneCenterX(player.lane);
-      player.x += (targetX - player.x) * 0.22;
-
-      if (gameRunning) {
-        drawCar(player.x, player.y, player.width, player.height, player.color, true);
-
-        // Spawn enemy traffic
+        // Spawn traffic
         spawnTimer++;
-        const spawnInterval = Math.max(38, Math.floor(95 - baseSpeed * 4));
         if (spawnTimer >= spawnInterval) {
-          spawnTraffic();
           spawnTimer = 0;
+          spawnEnemyWave();
         }
 
-        // Update & draw enemy cars
+        // Update enemy cars
         for (let i = enemies.length - 1; i >= 0; i--) {
-          const e = enemies[i];
-          e.y += baseSpeed + e.speedOffset;
-          drawCar(e.x, e.y, e.width, e.height, e.color, false);
+          const enemy = enemies[i];
+          enemy.y += speed + enemy.speedOffset;
 
-          // Check collision (slightly forgiving hitbox)
-          const hitX = Math.abs(player.x - e.x) < (player.width + e.width) * 0.42;
-          const hitY = Math.abs(player.y - e.y) < (player.height + e.height) * 0.44;
-          if (hitX && hitY) {
-            endGame();
-          }
-
-          // Score point when passed safely
-          if (!e.passed && e.y > player.y + player.height / 2) {
-            e.passed = true;
-            score++;
-            scoreEl.textContent = score;
-            baseSpeed += 0.14; // Gradually speed up
+          // Score point when safely passing enemy
+          if (!enemy.passed && enemy.y > player.y + player.height * 0.7) {
+            enemy.passed = true;
+            score += 1;
+            scoreDisplay.textContent = score;
             playSound('score');
+            addFloatingText(player.x, player.y - 10, '+1');
           }
 
-          // Remove off-screen cars
-          if (e.y > canvas.height + 100) {
+          // Forgiving AABB collision check (slight hitbox padding feels fair)
+          const padX = player.width * 0.16;
+          const padY = player.height * 0.12;
+          if (
+            player.x - player.width / 2 + padX < enemy.x + enemy.width / 2 - padX &&
+            player.x + player.width / 2 - padX > enemy.x - enemy.width / 2 + padX &&
+            player.y + padY < enemy.y + enemy.height - padY &&
+            player.y + player.height - padY > enemy.y + padY
+          ) {
+            triggerGameOver();
+            break;
+          }
+
+          // Remove offscreen cars
+          if (enemy.y > height + 120) {
             enemies.splice(i, 1);
           }
         }
       }
 
-      // Draw explosion particles
+      // Update particles
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.x += p.vx;
         p.y += p.vy;
         p.alpha -= 0.025;
-        if (p.alpha <= 0) {
-          particles.splice(i, 1);
-          continue;
-        }
-        ctx.globalAlpha = p.alpha;
+        if (p.alpha <= 0) particles.splice(i, 1);
+      }
+
+      // Update floating score popups
+      for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        const ft = floatingTexts[i];
+        ft.y -= 1.4;
+        ft.alpha -= 0.03;
+        if (ft.alpha <= 0) floatingTexts.splice(i, 1);
+      }
+    }
+
+    // --- RENDERING ---
+    function drawCar(x, y, w, h, colors, isPlayer = false, tilt = 0) {
+      ctx.save();
+      ctx.translate(x, y + h / 2);
+      ctx.rotate(tilt);
+
+      const hw = w / 2;
+      const hh = h / 2;
+
+      // Ground shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.beginPath();
+      ctx.roundRect(-hw + 3, -hh + 6, w, h, 12);
+      ctx.fill();
+
+      // Tires
+      ctx.fillStyle = '#090d16';
+      const tireW = 5;
+      const tireH = h * 0.22;
+      ctx.fillRect(-hw - 3, -hh + h * 0.14, tireW, tireH);
+      ctx.fillRect(hw - 2, -hh + h * 0.14, tireW, tireH);
+      ctx.fillRect(-hw - 3, hh - h * 0.36, tireW, tireH);
+      ctx.fillRect(hw - 2, hh - h * 0.36, tireW, tireH);
+
+      // Car Chassis
+      ctx.fillStyle = colors.body;
+      ctx.beginPath();
+      ctx.roundRect(-hw, -hh, w, h, 11);
+      ctx.fill();
+
+      // Racing Stripe / Trim
+      ctx.fillStyle = colors.accent;
+      ctx.fillRect(-w * 0.08, -hh + 2, w * 0.16, h - 4);
+
+      // Cabin / Roof
+      ctx.fillStyle = colors.roof;
+      ctx.beginPath();
+      ctx.roundRect(-hw * 0.76, -hh * 0.45, w * 0.76, h * 0.52, 7);
+      ctx.fill();
+
+      // Windshield
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      if (isPlayer) {
+        ctx.roundRect(-hw * 0.68, -hh * 0.42, w * 0.68, h * 0.18, 4);
+      } else {
+        ctx.roundRect(-hw * 0.68, hh * 0.18, w * 0.68, h * 0.18, 4);
+      }
+      ctx.fill();
+
+      // Headlights & Taillights
+      if (isPlayer) {
+        // Headlight beams
+        const beamGrad = ctx.createLinearGradient(0, -hh, 0, -hh - 55);
+        beamGrad.addColorStop(0, 'rgba(186, 230, 253, 0.45)');
+        beamGrad.addColorStop(1, 'rgba(186, 230, 253, 0)');
+        ctx.fillStyle = beamGrad;
+        ctx.beginPath();
+        ctx.moveTo(-hw * 0.75, -hh);
+        ctx.lineTo(-hw * 1.25, -hh - 55);
+        ctx.lineTo(hw * 1.25, -hh - 55);
+        ctx.lineTo(hw * 0.75, -hh);
+        ctx.closePath();
+        ctx.fill();
+
+        // Front lights
+        ctx.fillStyle = '#e0f2fe';
+        ctx.fillRect(-hw * 0.78, -hh + 1, w * 0.24, 4);
+        ctx.fillRect(hw * 0.54, -hh + 1, w * 0.24, 4);
+
+        // Rear neon taillights
+        ctx.fillStyle = '#f43f5e';
+        ctx.fillRect(-hw * 0.78, hh - 4, w * 0.26, 3);
+        ctx.fillRect(hw * 0.52, hh - 4, w * 0.26, 3);
+      } else {
+        // Oncoming headlights facing down
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(-hw * 0.78, hh - 4, w * 0.24, 4);
+        ctx.fillRect(hw * 0.54, hh - 4, w * 0.24, 4);
+      }
+
+      ctx.restore();
+    }
+
+    function drawScene() {
+      // Background shoulder
+      ctx.fillStyle = '#0b0e17';
+      ctx.fillRect(0, 0, width, height);
+
+      // Asphalt Road
+      const roadWidth = width - roadMargin * 2;
+      ctx.fillStyle = '#181c2c';
+      ctx.fillRect(roadMargin, 0, roadWidth, height);
+
+      // Neon Road Edge Rails
+      ctx.fillStyle = '#06b6d4';
+      ctx.fillRect(roadMargin - 3, 0, 3, height);
+      ctx.fillRect(width - roadMargin, 0, 3, height);
+
+      // Dashed Lane Dividers
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([30, 30]);
+      ctx.lineDashOffset = -roadOffset;
+
+      for (let i = 1; i < LANE_COUNT; i++) {
+        const lineX = roadMargin + laneWidth * i;
+        ctx.beginPath();
+        ctx.moveTo(lineX, 0);
+        ctx.lineTo(lineX, height);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+
+      // Draw Enemy Traffic
+      for (const enemy of enemies) {
+        drawCar(enemy.x, enemy.y, enemy.width, enemy.height, enemy.style, false, 0);
+      }
+
+      // Draw Player Car (unless wrecked)
+      if (gameState !== 'GAMEOVER') {
+        drawCar(
+          player.x,
+          player.y,
+          player.width,
+          player.height,
+          { body: '#0284c7', accent: '#38bdf8', roof: '#0369a1' },
+          true,
+          player.tilt
+        );
+      }
+
+      // Draw Explosion Particles
+      for (const p of particles) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.alpha);
         ctx.fillStyle = p.color;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
-        ctx.globalAlpha = 1;
+        ctx.restore();
       }
 
-      if (gameRunning || particles.length > 0) {
-        requestAnimationFrame(gameLoop);
+      // Draw Floating "+1" Score Popups
+      ctx.font = '800 18px Orbitron, sans-serif';
+      ctx.textAlign = 'center';
+      for (const ft of floatingTexts) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, ft.alpha);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillText(ft.text, ft.x, ft.y);
+        ctx.restore();
       }
     }
 
-    document.getElementById('start-btn').addEventListener('click', startGame);
-    document.getElementById('restart-btn').addEventListener('click', startGame);
+    function gameLoop() {
+      update();
+      drawScene();
+      animationId = requestAnimationFrame(gameLoop);
+    }
+
+    // Initialize on window load
+    window.onload = function () {
+      resizeCanvas();
+      drawScene();
+      gameLoop();
+    };
   </script>
 </body>
 </html>
