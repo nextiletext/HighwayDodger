@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Neon Highway Dodger</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      background-color: #090a10;
+      color: #ffffff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #game-container {
+      position: relative;
+      width: 100%;
+      max-width: 420px;
+      height: 100vh;
+      max-height: 760px;
+      background: #121521;
+      border-left: 2px solid #1e2438;
+      border-right: 2px solid #1e2438;
+      box-shadow: 0 0 40px rgba(0, 240, 255, 0.15);
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* HUD */
+    #hud {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .score-box {
+      background: rgba(12, 16, 28, 0.8);
+      border: 1px solid rgba(0, 240, 255, 0.35);
+      padding: 8px 14px;
+      border-radius: 10px;
+      backdrop-filter: blur(4px);
+    }
+
+    .score-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #8896b8;
+    }
+
+    .score-val {
+      font-size: 22px;
+      font-weight: 800;
+      color: #00f0ff;
+      text-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
+    }
+
+    #best-val {
+      color: #ff2a85;
+      text-shadow: 0 0 10px rgba(255, 42, 133, 0.6);
+    }
+
+    /* Overlays (Start & Game Over) */
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(9, 11, 18, 0.85);
+      backdrop-filter: blur(6px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 24px;
+      z-index: 20;
+      transition: opacity 0.25s ease;
+    }
+
+    .hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #00f0ff, #ff2a85);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 10px;
+    }
+
+    p.subtitle {
+      color: #a0aec0;
+      font-size: 15px;
+      margin-bottom: 28px;
+      line-height: 1.5;
+    }
+
+    button.btn {
+      background: linear-gradient(135deg, #00f0ff, #0099ff);
+      color: #070a12;
+      border: none;
+      padding: 14px 36px;
+      font-size: 18px;
+      font-weight: 800;
+      border-radius: 999px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.5);
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    button.btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 28px rgba(0, 240, 255, 0.8);
+    }
+
+    button.btn:active {
+      transform: scale(0.97);
+    }
+
+    /* Mobile Touch Controls */
+    #touch-controls {
+      position: absolute;
+      bottom: 18px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      z-index: 15;
+    }
+
+    .touch-btn {
+      flex: 1;
+      height: 58px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 24px;
+      font-weight: bold;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .touch-btn:active {
+      background: rgba(0, 240, 255, 0.25);
+      border-color: #00f0ff;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <div id="hud">
+      <div class="score-box">
+        <div class="score-label">Score</div>
+        <div class="score-val" id="score-val">0</div>
+      </div>
+      <div class="score-box">
+        <div class="score-label">Best</div>
+        <div class="score-val" id="best-val">0</div>
+      </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Start Screen -->
+    <div class="overlay" id="start-screen">
+      <h1>Neon Dodger</h1>
+      <p class="subtitle">
+        Use <strong>Left / Right Arrows</strong> (or <strong>A / D</strong>) to switch lanes.<br />
+        Dodge oncoming traffic to rack up points!
+      </p>
+      <button class="btn" id="start-btn">Start Engine</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div class="overlay hidden" id="gameover-screen">
+      <h1>Wrecked!</h1>
+      <p class="subtitle">Final Score: <strong id="final-score" style="color:#00f0ff; font-size:20px;">0</strong></p>
+      <button class="btn" id="restart-btn">Play Again</button>
+    </div>
+
+    <!-- On-Screen Buttons for Mobile/Mouse -->
+    <div id="touch-controls">
+      <div class="touch-btn" id="btn-left">&#9664;</div>
+      <div class="touch-btn" id="btn-right">&#9654;</div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('game-container');
+
+    // UI Elements
+    const scoreEl = document.getElementById('score-val');
+    const bestEl = document.getElementById('best-val');
+    const finalScoreEl = document.getElementById('final-score');
+    const startScreen = document.getElementById('start-screen');
+    const gameoverScreen = document.getElementById('gameover-screen');
+
+    // Game State
+    const LANES = 3;
+    let laneWidth = 0;
+    let gameRunning = false;
+    let score = 0;
+    let bestScore = localStorage.getItem('neonDodgerBest') || 0;
+    bestEl.textContent = bestScore;
+
+    let baseSpeed = 5;
+    let roadOffset = 0;
+    let spawnTimer = 0;
+    let enemies = [];
+    let particles = [];
+
+    // Player Object
+    const player = {
+      lane: 1, // 0 = left, 1 = middle, 2 = right
+      x: 0,
+      y: 0,
+      width: 44,
+      height: 78,
+      color: '#00f0ff'
+    };
+
+    // Resize canvas to fit container crisply
+    function resizeCanvas() {
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+      laneWidth = canvas.width / LANES;
+      player.y = canvas.height - 155;
+      if (!gameRunning) {
+        player.x = getLaneCenterX(player.lane);
+      }
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function getLaneCenterX(laneIndex) {
+      return laneIndex * laneWidth + laneWidth / 2;
+    }
+
+    // Simple Web Audio Sound Effects (No external files needed)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(type) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      const now = audioCtx.currentTime;
+      if (type === 'move') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(280, now);
+        osc.frequency.exponentialRampToValueAtTime(480, now + 0.08);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc.start(now);
+        osc.stop(now + 0.08);
+      } else if (type === 'score') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.setValueAtTime(780, now + 0.06);
+        gain.gain.setValueAtTime(0.07, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+        osc.start(now);
+        osc.stop(now + 0.14);
+      } else if (type === 'crash') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.exponentialRampToValueAtTime(35, now + 0.4);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        osc.start(now);
+        osc.stop(now + 0.4);
+      }
+    }
+
+    // Controls
+    function moveLeft() {
+      if (!gameRunning) return;
+      if (player.lane > 0) {
+        player.lane--;
+        playSound('move');
+      }
+    }
+
+    function moveRight() {
+      if (!gameRunning) return;
+      if (player.lane < LANES - 1) {
+        player.lane++;
+        playSound('move');
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') moveLeft();
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') moveRight();
+    });
+
+    document.getElementById('btn-left').addEventListener('pointerdown', moveLeft);
+    document.getElementById('btn-right').addEventListener('pointerdown', moveRight);
+
+    // Spawn oncoming cars (guarantees at least 1 open lane)
+    function spawnTraffic() {
+      const colors = ['#ff2a85', '#ffbe0b', '#8338ec', '#fb5607'];
+      const lanes = [0, 1, 2];
+      // Shuffle lanes
+      lanes.sort(() => Math.random() - 0.5);
+
+      // Spawn 1 or 2 cars depending on current score
+      const count = score > 8 && Math.random() > 0.45 ? 2 : 1;
+
+      for (let i = 0; i < count; i++) {
+        const lane = lanes[i];
+        enemies.push({
+          lane,
+          x: getLaneCenterX(lane),
+          y: -90,
+          width: 44,
+          height: 78,
+          speedOffset: Math.random() * 1.5,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          passed: false
+        });
+      }
+    }
+
+    // Create explosion particles on crash
+    function createExplosion(x, y) {
+      for (let i = 0; i < 35; i++) {
+        particles.push({
+          x,
+          y,
+          vx: (Math.random() - 0.5) * 10,
+          vy: (Math.random() - 0.5) * 10,
+          size: Math.random() * 5 + 2,
+          alpha: 1,
+          color: Math.random() > 0.5 ? '#00f0ff' : '#ff2a85'
+        });
+      }
+    }
+
+    // Draw a stylized top-down neon car
+    function drawCar(x, y, w, h, color, isPlayer) {
+      ctx.save();
+      ctx.translate(x - w / 2, y - h / 2);
+
+      // Neon underglow
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 16;
+
+      // Car body
+      ctx.fillStyle = '#161b2e';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, w, h, 10);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.shadowBlur = 0;
+
+      // Windshield & Roof
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.25;
+      ctx.beginPath();
+      ctx.roundRect(6, isPlayer ? 22 : 18, w - 12, h - 40, 6);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // Headlights / Taillights
+      if (isPlayer) {
+        // White headlights facing up
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(6, 2, 8, 4);
+        ctx.fillRect(w - 14, 2, 8, 4);
+      } else {
+        // Glowing headlights facing down
+        ctx.fillStyle = '#fff3b0';
+        ctx.fillRect(6, h - 6, 8, 4);
+        ctx.fillRect(w - 14, h - 6, 8, 4);
+      }
+
+      ctx.restore();
+    }
+
+    function startGame() {
+      score = 0;
+      baseSpeed = 5.5;
+      enemies = [];
+      particles = [];
+      player.lane = 1;
+      player.x = getLaneCenterX(1);
+      scoreEl.textContent = '0';
+
+      startScreen.classList.add('hidden');
+      gameoverScreen.classList.add('hidden');
+      gameRunning = true;
+      requestAnimationFrame(gameLoop);
+    }
+
+    function endGame() {
+      gameRunning = false;
+      playSound('crash');
+      createExplosion(player.x, player.y);
+
+      if (score > bestScore) {
+        bestScore = score;
+        localStorage.setItem('neonDodgerBest', bestScore);
+        bestEl.textContent = bestScore;
+      }
+
+      finalScoreEl.textContent = score;
+      setTimeout(() => {
+        gameoverScreen.classList.remove('hidden');
+      }, 450);
+    }
+
+    function gameLoop() {
+      // Clear road background
+      ctx.fillStyle = '#121521';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw scrolling lane dividers
+      if (gameRunning) {
+        roadOffset = (roadOffset + baseSpeed) % 60;
+      }
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([30, 30]);
+      ctx.lineDashOffset = -roadOffset;
+
+      for (let i = 1; i < LANES; i++) {
+        const lineX = i * laneWidth;
+        ctx.beginPath();
+        ctx.moveTo(lineX, 0);
+        ctx.lineTo(lineX, canvas.height);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+
+      // Smoothly glide player toward target lane X
+      const targetX = getLaneCenterX(player.lane);
+      player.x += (targetX - player.x) * 0.22;
+
+      if (gameRunning) {
+        drawCar(player.x, player.y, player.width, player.height, player.color, true);
+
+        // Spawn enemy traffic
+        spawnTimer++;
+        const spawnInterval = Math.max(38, Math.floor(95 - baseSpeed * 4));
+        if (spawnTimer >= spawnInterval) {
+          spawnTraffic();
+          spawnTimer = 0;
+        }
+
+        // Update & draw enemy cars
+        for (let i = enemies.length - 1; i >= 0; i--) {
+          const e = enemies[i];
+          e.y += baseSpeed + e.speedOffset;
+          drawCar(e.x, e.y, e.width, e.height, e.color, false);
+
+          // Check collision (slightly forgiving hitbox)
+          const hitX = Math.abs(player.x - e.x) < (player.width + e.width) * 0.42;
+          const hitY = Math.abs(player.y - e.y) < (player.height + e.height) * 0.44;
+          if (hitX && hitY) {
+            endGame();
+          }
+
+          // Score point when passed safely
+          if (!e.passed && e.y > player.y + player.height / 2) {
+            e.passed = true;
+            score++;
+            scoreEl.textContent = score;
+            baseSpeed += 0.14; // Gradually speed up
+            playSound('score');
+          }
+
+          // Remove off-screen cars
+          if (e.y > canvas.height + 100) {
+            enemies.splice(i, 1);
+          }
+        }
+      }
+
+      // Draw explosion particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.alpha -= 0.025;
+        if (p.alpha <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      if (gameRunning || particles.length > 0) {
+        requestAnimationFrame(gameLoop);
+      }
+    }
+
+    document.getElementById('start-btn').addEventListener('click', startGame);
+    document.getElementById('restart-btn').addEventListener('click', startGame);
+  </script>
+</body>
+</html>
